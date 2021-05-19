@@ -1,0 +1,41 @@
+﻿<Window x:Class="my_dropbox_app.window_create_folder_input"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:my_dropbox_app"
+        mc:Ignorable="d"
+        Title="Создание папки" Height="191.091" Width="350.794" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+        </Grid.RowDefinitions>
+        <Label Grid.RowSpan="2" Grid.ColumnSpan="8" Grid.Column="1" Grid.Row="1" Content="Введите имя создаваемой папки">
+        </Label>
+        <TextBox VerticalContentAlignment="Center" Name="textBox1" Grid.RowSpan="2" Grid.ColumnSpan="8" Grid.Column="1" Grid.Row="3">
+        </TextBox>
+        <Button Click="to_confirm_create" Grid.RowSpan="2" Grid.ColumnSpan="3" Grid.Row="6" Grid.Column="1" Content="Подтвердить"></Button>
+        <Button Click="cancel_create" Grid.RowSpan="2" Grid.ColumnSpan="3" Grid.Column="6"  Grid.Row="6" Content="Отмена"></Button>    
+    </Grid>
+</Window>

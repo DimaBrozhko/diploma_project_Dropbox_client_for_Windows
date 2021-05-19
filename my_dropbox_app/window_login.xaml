@@ -1,0 +1,53 @@
+﻿<Window x:Class="my_dropbox_app.window_login"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:my_dropbox_app"
+        mc:Ignorable="d"
+        Title="Аутентификация в Friendly Dropbox" Height="390.91" Width="300" WindowStartupLocation="CenterScreen" ResizeMode="NoResize">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+            <ColumnDefinition></ColumnDefinition>
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+            <RowDefinition></RowDefinition>
+        </Grid.RowDefinitions>
+        <Button Grid.Column="3" Grid.Row="16" Grid.ColumnSpan="4" Grid.RowSpan="2" Content="Создать профиль" Click="registration" TabIndex="4"></Button>
+        <Button Grid.Column="3" Grid.Row="13" Grid.ColumnSpan="4" Grid.RowSpan="2" Content="Войти" TabIndex="3" Click="autentification"></Button>
+        <TextBox VerticalContentAlignment="Center" Name="textBox_password" Grid.Row="10" Grid.Column="2" Grid.ColumnSpan="6" Grid.RowSpan="2" TabIndex="2">dimas1</TextBox>
+        <TextBox VerticalContentAlignment="Center" Name="textBox_login" Grid.Row="6" Grid.Column="2" Grid.ColumnSpan="6" Grid.RowSpan="2" TabIndex="1">dimas</TextBox>
+        <Label VerticalContentAlignment="Bottom" HorizontalContentAlignment="Center" Grid.ColumnSpan="10" Grid.RowSpan="2" Grid.Row="4" Content="Логин"></Label>
+        <Label VerticalContentAlignment="Bottom" HorizontalContentAlignment="Center" Grid.ColumnSpan="10" Grid.RowSpan="2" Grid.Row="8" Content="Пароль"></Label>
+        <TextBlock TextAlignment="Center" TextWrapping="Wrap" Grid.Row="0" Grid.Column="1" Grid.RowSpan="4" Grid.ColumnSpan="8" Text="Войдите в свою учетную запись Friendly Dropbox или создайте новую. Она нужна для аутентификации разных пользователей в приложении."></TextBlock>
+
+    </Grid>
+</Window>
