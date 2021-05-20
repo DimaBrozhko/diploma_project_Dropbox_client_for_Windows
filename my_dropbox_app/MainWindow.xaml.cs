@@ -793,6 +793,22 @@ namespace my_dropbox_app
             }
         }
 
+        public void find_server_files_to_sync(string _server_path)
+        {
+            var files = client.Files.ListFolderAsync(_server_path);
+            foreach (var file in files.Result.Entries)
+            {
+                if (file.IsFolder)
+                {
+                    find_server_files_to_sync(file.PathDisplay);
+                }
+                else if (file.IsFile)
+                {
+                    server_files_to_sync.Add(file.PathDisplay);
+                }
+            }
+        }
+
         public string list_to_string(List<string> _list)
         {
             string str = "";
@@ -806,120 +822,128 @@ namespace my_dropbox_app
         private async void start_sync(object sender, RoutedEventArgs e)
         {
             local_files_to_sync.Clear();
+            server_files_to_sync.Clear();
             find_local_files_to_sync(current_user.path_local_sync);
-            string server_path = "";
+            find_server_files_to_sync(current_user.path_server_sync);
+            
+            List<string> local_file_names = new List<string>();
+            List<string> server_file_names = new List<string>();
+            string sync_folder = current_user.sync_folder_name;
+            string s = "";
             int index = 0;
-            int len = 0;
-            foreach (var path in local_files_to_sync)
+            foreach (string file in local_files_to_sync)
             {
-                index = path.IndexOf($@"\{current_user.sync_folder_name}\");
-                len = current_user.sync_folder_name.Length;
-                server_path = current_user.path_server_sync + path.Substring(index + 1 + len, path.Length - index - 1 - len).Replace('\\', '/');
-                server_files_to_sync.Add(server_path);
+                index = file.IndexOf($@"\{sync_folder}\");
+                s = file.Substring(index + 2 + sync_folder.Length, file.Length - 2 - index - sync_folder.Length).Replace('\\', '/');
+                local_file_names.Add(s);
             }
-            SearchV2Result search_result = null;
-            bool file_exist_on_server = false;
-            bool file_exist_on_local = false;
-            for (int i = 0; i < local_files_to_sync.Count; i++)
+            foreach (string file in server_files_to_sync)
             {
-                string serv = server_files_to_sync[i].Substring(0, server_files_to_sync[i].LastIndexOf('/'));
-                var list = await client.Files.ListFolderAsync(serv);
-                string f = "";
-                foreach (var item in list.Entries.Where(j => j.IsFile))
-                {
-                    var file = item.AsFile;
-                    file_exist_on_server = file.PathDisplay == server_files_to_sync[i] ? true : false;
-                }
-                file_exist_on_local = File.Exists(local_files_to_sync[i]);
-                // if file exist in local devise and does not exist in server - upload file on server
-                if (file_exist_on_local & !file_exist_on_server)
-                {
-                    upload_file(server_files_to_sync[i], local_files_to_sync[i]);
-                    // upload
-                }
-                // if file exist on server and does not exist in local - download file to local
-                // does not work yet
-                else if (!file_exist_on_local & file_exist_on_server)
-                {
-                    MessageBox.Show("download");
-                    // download file
-                }
-                // if file exist in both device - compahe hash and update file if need
-                else if (file_exist_on_local & file_exist_on_server)
-                {
-                    var server_hash = client.Files.GetMetadataAsync(server_files_to_sync[i]).Result.AsFile.ContentHash;
-                    //MessageBox.Show(server_hash);
-                    //bool b = File.Exists(@"C:\Users\FOX\Desktop\milky-way-nasa.jpg");
-                    //MessageBox.Show($"{b}");
-                    
-
-                    //MessageBox.Show("update");
-                    // update file
-                }
+                //MessageBox.Show(file);
+                index = file.IndexOf($@"/{sync_folder}/");
+                s = file.Substring(index + 2 + sync_folder.Length, file.Length - 2 - index - sync_folder.Length);
+                server_file_names.Add(s);
             }
-
-        }
-
-        public byte[] Combine(List<byte[]> arrays)
-        {
-            byte[] rv = new byte[arrays.Sum(a => a.Length)];
-            int offset = 0;
-            foreach (byte[] array in arrays)
+            List<string> to_update = new List<string>();
+            List<string> to_upload = new List<string>();
+            List<string> to_download = new List<string>();
+            //MessageBox.Show($"server files\r{list_to_string(server_file_names)}\r" +
+            //    $"\r\rlocal_files\r{list_to_string(local_file_names)}");
+            string str = "";
+            for (int loc = 0; loc < local_file_names.Count; loc++)
             {
-                System.Buffer.BlockCopy(array, 0, rv, offset, array.Length);
-                offset += array.Length;
+                str = local_file_names[loc];
+                if (server_file_names.Contains(str))
+                {
+                    to_update.Add(str);
+                    server_file_names.Remove(str);
+                    //local_file_names.Remove(str);
+                }
+                else
+                {
+                    to_upload.Add(str);
+
+                    //local_file_names.Remove(str);
+                }
+                //to_download.Add(server_file_names[loc]);
             }
-            return rv;
+            to_download = server_file_names;
+            //MessageBox.Show($"to update\r{list_to_string(to_update)}\r\rto upload\r" +
+            //    $"{list_to_string(to_upload)}\r\rto download\r{list_to_string(to_download)}");
+            string local_path = "", server_path = "";
+            string local_hash = "", server_hash = "";
+            // update files
+            foreach (string file in to_update)
+            {
+                local_path = $"{current_user.path_local_sync}\\{file}".Replace('/', '\\');
+                server_path = $"{current_user.path_server_sync}/{file}".Replace('\\', '/');
+                server_hash = client.Files.GetMetadataAsync(server_path).Result.AsFile.ContentHash;
+                local_hash = get_hash(local_path);
+                if (local_hash != server_hash)
+                {
+                    upload_file(server_path, local_path);
+                }
+
+                //MessageBox.Show($"{file}\r\r{server_hash}\r{local_hash}");
+                
+                //MessageBox.Show($"file: {file}\rlocal: {local_path}\rserver: {server_path}");
+            }
+
+
+            //MessageBox.Show($"{list_to_string(local_file_names)}\r\r\r{list_to_string(server_file_names)}");
         }
 
 
 
         public string get_hash(string _path_to_file)
         {
-            FileStream stream = new FileStream(_path_to_file, FileMode.Open, FileAccess.Read);
-            int buffer_size = 4 * 1024 * 1024;
-            byte[] block;
-            byte[] hash_block;
-            long left_read = stream.Length;
-            int size = 0;
-            List<byte[]> hash_block_list = new List<byte[]>();
-            bool continue_read = true;
-            while (continue_read)
+            using (FileStream stream = new FileStream(_path_to_file, FileMode.Open, FileAccess.Read))
             {
-                using (SHA256 sha256 = SHA256.Create())
+                int buffer_size = 4 * 1024 * 1024;
+                byte[] block;
+                byte[] hash_block;
+                long left_read = stream.Length;
+                int size = 0;
+                List<byte[]> hash_block_list = new List<byte[]>();
+                bool continue_read = true;
+                while (continue_read)
                 {
-                    if (left_read > buffer_size)
+                    using (SHA256 sha256 = SHA256.Create())
                     {
-                        block = new byte[buffer_size];
-                        stream.Read(block, 0, buffer_size);
-                        continue_read = true;
-                        left_read -= buffer_size;
+                        if (left_read > buffer_size)
+                        {
+                            block = new byte[buffer_size];
+                            stream.Read(block, 0, buffer_size);
+                            continue_read = true;
+                            left_read -= buffer_size;
+                        }
+                        else
+                        {
+                            block = new byte[left_read];
+                            stream.Read(block, 0, (int)left_read);
+                            continue_read = false;
+                        }
+                        hash_block = sha256.ComputeHash(block);
+                        hash_block_list.Add(hash_block);
+                        size += 32;
                     }
-                    else
-                    {
-                        block = new byte[left_read];
-                        stream.Read(block, 0, (int)left_read);
-                        continue_read = false;
-                    }
-                    hash_block = sha256.ComputeHash(block);
-                    hash_block_list.Add(hash_block);
-                    size += 32;
                 }
+                byte[] all_hash_block = new byte[size];
+                int offset = 0;
+                foreach (byte[] mas in hash_block_list)
+                {
+                    mas.CopyTo(all_hash_block, offset);
+                    offset += 32;
+                }
+                string result;
+                using (SHA256 sha = SHA256.Create())
+                {
+                    byte[] mas = sha.ComputeHash(all_hash_block);
+                    result = ToHex(mas);
+                }
+                return result;
+
             }
-            byte[] all_hash_block = new byte[size];
-            int offset = 0;
-            foreach (byte[] mas in hash_block_list)
-            {
-                mas.CopyTo(all_hash_block, offset);
-                offset += 32;
-            }
-            string result;
-            using (SHA256 sha = SHA256.Create())
-            {
-                byte[] mas = sha.ComputeHash(all_hash_block);
-                result = ToHex(mas);
-            }
-            return result;
         }
 
         const string HEX_DIGITS = "0123456789abcdef";
