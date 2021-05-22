@@ -300,7 +300,7 @@ namespace my_dropbox_app
                     try
                     {
                         add_progress_bar(file_name);
-                        await Task.Run(() => download_file(path, file_name));
+                        await Task.Run(() => download_file(path, file_name, null));
                     }
                     catch (ArgumentException)
                     {
@@ -324,7 +324,7 @@ namespace my_dropbox_app
                 else if (file.IsFile)
                 {
                     add_progress_bar(file.Name);
-                    await Task.Run(() => download_file(file.PathDisplay, file.Name));
+                    await Task.Run(() => download_file(file.PathDisplay, file.Name, null));
                 }
             }
             return null;
@@ -439,7 +439,7 @@ namespace my_dropbox_app
         public void add_progress_bar(string _raw_file_name)
         {
             string file_name = _raw_file_name.Replace('.', 'd').Replace(' ', 's').Replace('=', 'e')
-                .Replace(',', 'c').Replace('(', 'l').Replace(')', 'r');
+                .Replace(',', 'c').Replace('(', 'l').Replace(')', 'r').Replace('-', 't');
             //ser = file_name;
             ProgressBar progress_bar = new ProgressBar();
             progress_bar.Height = 25;
@@ -479,6 +479,7 @@ namespace my_dropbox_app
                 this.RegisterName($"label_file_name_{file_name}", label_file_name);
                 this.RegisterName($"label_percent_{file_name}", label_percent);
                 this.RegisterName($"grid_progress_{file_name}", grid_progress);
+                //MessageBox.Show($"grid_progress_{file_name}");
             }
             catch (Exception ex)
             {
@@ -495,18 +496,33 @@ namespace my_dropbox_app
 
             stackPanel_progress.Children.Add(grid_progress);
         }
-        public async void download_file(string _path, string _raw_file_name)
+        public async void download_file(string _server_path, string _raw_file_name, string _local_path)
         {
+
+            
+
             string file_name = _raw_file_name.Replace('.', 'd').Replace(' ', 's').Replace('=', 'e')
-                .Replace(',', 'c').Replace('(', 'l').Replace(')', 'r');
-            var response = await client.Files.DownloadAsync(_path);
+                .Replace(',', 'c').Replace('(', 'l').Replace(')', 'r').Replace('-', 't');
+            //bool f = (Grid)this.FindName($"grid_progress_{file_name}") != null ? true : false;
+            //MessageBox.Show($"start download {f}");
+            var response = await client.Files.DownloadAsync(_server_path);
             ulong fileSize = response.Response.Size;
             const int bufferSize = 1024 * 1024 * 500;
             var buffer = new byte[bufferSize];
+            string local_path = "";
             using (var content = await response.GetContentAsStreamAsync())
             {
                 //using (var file = new FileStream(path_to_local_download_folder + _raw_file_name, FileMode.Create))
-                using (var file = new FileStream(path_to_local_download_folder + _path/*_raw_file_name*/, FileMode.Create))
+                if (_local_path == null)
+                {
+                    local_path = path_to_local_download_folder + _server_path;
+                }
+                else
+                {
+                    local_path = _local_path;
+                }
+                //MessageBox.Show($"local path   {local_path}\rserver path    {_server_path}\rraw      {_raw_file_name}");
+                using (var file = new FileStream(local_path, FileMode.Create))
                 {
                     var length = content.Read(buffer, 0, bufferSize);
                     while (length > 0)
@@ -868,27 +884,48 @@ namespace my_dropbox_app
                 //to_download.Add(server_file_names[loc]);
             }
             to_download = server_file_names;
-            //MessageBox.Show($"to update\r{list_to_string(to_update)}\r\rto upload\r" +
-            //    $"{list_to_string(to_upload)}\r\rto download\r{list_to_string(to_download)}");
+            MessageBox.Show($"to update\r{list_to_string(to_update)}\r\rto upload\r" +
+                $"{list_to_string(to_upload)}\r\rto download\r{list_to_string(to_download)}");
             string local_path = "", server_path = "";
             string local_hash = "", server_hash = "";
             // update files
+            long local_size = 0, server_size = 0;
             foreach (string file in to_update)
             {
                 local_path = $"{current_user.path_local_sync}\\{file}".Replace('/', '\\');
                 server_path = $"{current_user.path_server_sync}/{file}".Replace('\\', '/');
+                local_size = (new FileInfo(local_path)).Length;
+                server_size = (long)client.Files.GetMetadataAsync(server_path).Result.AsFile.Size;
+                //MessageBox.Show($"serv size {server_size}\rlocal size {local_size}");
                 server_hash = client.Files.GetMetadataAsync(server_path).Result.AsFile.ContentHash;
                 local_hash = get_hash(local_path);
-                if (local_hash != server_hash)
+                //MessageBox.Show($"file   {file}\rlocal hash   {local_hash}\rserve hash   {server_hash}\r{local_size}-{server_size}");
+                if ((local_size != 0) & (server_size != 0))
                 {
-                    upload_file(server_path, local_path);
+                    if (local_hash != server_hash)
+                    {
+                        //MessageBox.Show("upl");
+                        upload_file(server_path, local_path);
+                    }
                 }
-
-                //MessageBox.Show($"{file}\r\r{server_hash}\r{local_hash}");
-                
-                //MessageBox.Show($"file: {file}\rlocal: {local_path}\rserver: {server_path}");
             }
+            // upload files to server
+            foreach (string file in to_upload)
+            {
+                local_path = $"{current_user.path_local_sync}\\{file}".Replace('/', '\\');
+                server_path = $"{current_user.path_server_sync}/{file}".Replace('\\', '/');
+                //MessageBox.Show($"need upload\r{file}\r{local_path}\r{server_path}");
+                upload_file(server_path, local_path);
+            }
+            foreach (string file in to_download)
+            {
+                local_path = $"{current_user.path_local_sync}\\{file}".Replace('/', '\\');
+                server_path = $"{current_user.path_server_sync}/{file}".Replace('\\', '/');
 
+                add_progress_bar(extract_file_name_from_path(local_path));
+                await Task.Run(() => download_file(server_path, extract_file_name_from_path(local_path), local_path));
+
+            }
 
             //MessageBox.Show($"{list_to_string(local_file_names)}\r\r\r{list_to_string(server_file_names)}");
         }
