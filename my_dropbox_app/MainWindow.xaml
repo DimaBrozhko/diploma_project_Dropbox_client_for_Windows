@@ -47,13 +47,13 @@
                     <RowDefinition></RowDefinition>
                     <RowDefinition></RowDefinition>
                 </Grid.RowDefinitions>
-                <Button Grid.Column="2" Grid.Row="4" Grid.RowSpan="2" Click="start_sync">dd</Button>
+                <Button Grid.Column="2" Grid.Row="4" Grid.RowSpan="3" Grid.ColumnSpan="2" Click="start_sync">Синхронизировать</Button>
                 <TextBlock Grid.ColumnSpan="10" Grid.RowSpan="3" x:Name="textBlock_current_path"><Run Text="Текущий путь: "/></TextBlock>
                 <TextBlock TextAlignment="Right" Text="Текущий пользователь: user123" Grid.RowSpan="3" Grid.ColumnSpan="3" Grid.Row="4" Grid.Column="7" x:Name="textBox_user_name" ScrollViewer.CanContentScroll="True" Padding="0,0,5,0"></TextBlock>
             </Grid>
             <Rectangle Grid.Row="1" Grid.Column="0" Fill="White"/>
             <Border BorderThickness="1" Grid.Row="1" Grid.Column="0" BorderBrush="Black" >
-                <ListView x:Name="listView1"  Background="{x:Null}" MouseDoubleClick="listView1_MouseDoubleClick">
+                <ListView x:Name="listView1"  Background="{x:Null}" MouseDoubleClick="listView1_MouseDoubleClick" Margin="1,0,-1,0">
                     <ListView.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Скачать" Click="menu_click_download_file"/>

@@ -18,6 +18,7 @@ using System.Security.Cryptography;
 using Dropbox.Api;
 using Dropbox.Api.Files;
 using System.Text;
+using System.Data.SQLite;
 
 namespace my_dropbox_app
 {
@@ -26,7 +27,7 @@ namespace my_dropbox_app
     /// </summary>
     public partial class MainWindow : Window
     {
-        NameScope ns = new NameScope();
+        //NameScope ns = new NameScope();
 
         #region ************************************************** Global variables
         DropboxClient client;
@@ -46,16 +47,55 @@ namespace my_dropbox_app
 
         int uploading_file_count = 0;
         public window_login.User current_user;
+
+        SQLiteConnection sqlite_connection;
+        SQLiteCommand sqlite_command;
         #endregion
         public MainWindow(window_login.User _user)
         {
             InitializeComponent();
             current_user = _user;
+            if (!File.Exists("users_settings/users_keys.db"))
+            {
+                SQLiteConnection.CreateFile("users_settings/users_keys.db");
+                
+            }
+            sqlite_connection = new SQLiteConnection(@"Data Source=users_settings/users_keys.db; Version=3");
+            string create_tabe = "CREATE TABLE IF NOT EXISTS keys (" +
+                                 "id_key INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL," +
+                                 "login VARCHAR(50)," +
+                                 "local_path VARCHAR(150)," +
+                                 "server_path VARCHAR(150)," +
+                                 "key BLOB," +
+                                 "iv BLOB)";
+            sqlite_command = new SQLiteCommand(create_tabe, sqlite_connection);
+            sqlite_connection.Open();
+            sqlite_command.ExecuteNonQuery();
+            sqlite_connection.Close();
         }
 
-        
+
 
         #region ************************************************** Classes
+
+        //public class Users_keys
+        //{
+        //    public string login { get; set; }
+        //    public string password { get; set; }
+        //    public string file_path { get; set; }
+        //    public byte[] key { get; set; }
+        //    public byte[] iv { get; set; }
+
+        //    public Users_keys(string _login, string _password, string _file_path, byte[] _key, byte[] _iv)
+        //    {
+        //        login = _login;
+        //        password = _password;
+        //        file_path = _file_path;
+        //        key = _key;
+        //        iv = _iv;
+        //    }
+        //}
+
         public class Files_info
         {
             public string file_name { get; set; }
@@ -496,11 +536,9 @@ namespace my_dropbox_app
 
             stackPanel_progress.Children.Add(grid_progress);
         }
+
         public async void download_file(string _server_path, string _raw_file_name, string _local_path)
         {
-
-            
-
             string file_name = _raw_file_name.Replace('.', 'd').Replace(' ', 's').Replace('=', 'e')
                 .Replace(',', 'c').Replace('(', 'l').Replace(')', 'r').Replace('-', 't');
             //bool f = (Grid)this.FindName($"grid_progress_{file_name}") != null ? true : false;
@@ -515,12 +553,14 @@ namespace my_dropbox_app
                 //using (var file = new FileStream(path_to_local_download_folder + _raw_file_name, FileMode.Create))
                 if (_local_path == null)
                 {
-                    local_path = path_to_local_download_folder + _server_path;
+                    //MessageBox.Show("llll");
+                    local_path = path_to_local_download_folder + _raw_file_name;
                 }
                 else
                 {
                     local_path = _local_path;
                 }
+
                 //MessageBox.Show($"local path   {local_path}\rserver path    {_server_path}\rraw      {_raw_file_name}");
                 using (var file = new FileStream(local_path, FileMode.Create))
                 {
@@ -536,6 +576,7 @@ namespace my_dropbox_app
                         length = content.Read(buffer, 0, bufferSize);
                     }
                 }
+                decrypt_file(local_path, _server_path);
             }
             Application.Current.Dispatcher.Invoke(new Action(() => { file_download_complete(file_name, _raw_file_name); }));
         }
@@ -566,8 +607,6 @@ namespace my_dropbox_app
 
         private void menu_click_upload_file(object sender, RoutedEventArgs e)
         {
-            
-
             var current_path = get_current_path();
             var dialog = new OpenFileDialog();
             dialog.Multiselect = true;
@@ -582,18 +621,23 @@ namespace my_dropbox_app
             {
                 names.Add(name);
             }
+            string path_to_enc_file = "";
             for (int i = 0; i < names.Count; i++)
             {
                 //MessageBox.Show($"{current_path}/{names[i]}\r{paths[i]}");
-                upload_file($"{current_path}/{names[i]}", paths[i]);
+                
+                path_to_enc_file = encrypt_file($"{current_path}/{names[i]}", paths[i]);
+                //MessageBox.Show($"start upload file {names[i]} to server path {current_path}/{names[i]} from local path {path_to_enc_file}");
+                //save_key();
+                upload_file($"{current_path}/{names[i]}", path_to_enc_file, paths[i]);
             }
         }
 
-        public async void upload_file(string remotePath, string localPath)
+        public async void upload_file(string remotePath, string Path_to_enc_file, string local_path)
         {
             uploading_file_count++;
             const int ChunkSize = 4096 * 1024;
-            using (var fileStream = File.Open(localPath, FileMode.Open))
+            using (var fileStream = File.Open(Path_to_enc_file, FileMode.Open))
             {
                 if (fileStream.Length <= ChunkSize)
                 {
@@ -610,7 +654,8 @@ namespace my_dropbox_app
                 }
             }
             uploading_file_count--;
-            textBox_history.Text = $"Файл загружен успешно: {localPath} Осталось файлов: {uploading_file_count}\r" + textBox_history.Text;
+            File.Delete(Path_to_enc_file);
+            textBox_history.Text = $"Файл загружен успешно: {local_path} Осталось файлов: {uploading_file_count}\r" + textBox_history.Text;
         }
 
 
@@ -715,6 +760,7 @@ namespace my_dropbox_app
             Match match;
             string local_path = "";
             string server_path = "";
+            string path_to_enc_file = "";
             for (int i = 0; i < files_to_upload.Count; i++)
             {
                 local_path = files_to_upload[i];
@@ -724,7 +770,8 @@ namespace my_dropbox_app
                     .Substring(match.Index, files_to_upload[i].Length - match.Index)
                     .Replace('\\', '/');
                 //MessageBox.Show($"local_path: {local_path}\rserver_path: {server_path}");
-                upload_file(server_path, local_path);
+                path_to_enc_file = encrypt_file(server_path, local_path);
+                upload_file(server_path,path_to_enc_file, local_path);
             }
             //var s = await client.Files.CreateFolderBatchCheckAsync(id.);
         }
@@ -889,6 +936,7 @@ namespace my_dropbox_app
             string local_path = "", server_path = "";
             string local_hash = "", server_hash = "";
             // update files
+            string path_to_enc_file = "";
             long local_size = 0, server_size = 0;
             foreach (string file in to_update)
             {
@@ -905,7 +953,8 @@ namespace my_dropbox_app
                     if (local_hash != server_hash)
                     {
                         //MessageBox.Show("upl");
-                        upload_file(server_path, local_path);
+                        //path_to_enc_file = encrypt_file(local_path);
+                        upload_file(server_path, path_to_enc_file, local_path);
                     }
                 }
             }
@@ -914,8 +963,9 @@ namespace my_dropbox_app
             {
                 local_path = $"{current_user.path_local_sync}\\{file}".Replace('/', '\\');
                 server_path = $"{current_user.path_server_sync}/{file}".Replace('\\', '/');
+                //path_to_enc_file = encrypt_file(local_path);
                 //MessageBox.Show($"need upload\r{file}\r{local_path}\r{server_path}");
-                upload_file(server_path, local_path);
+                upload_file(server_path, path_to_enc_file, local_path);
             }
             foreach (string file in to_download)
             {
@@ -998,39 +1048,201 @@ namespace my_dropbox_app
         }
 
 
+        private string encrypt_file(string _server_path, string _local_path)
+        {
+            byte[] original_bytes = File.ReadAllBytes(_local_path);
+            string original = Encoding.UTF8.GetString(original_bytes);
+            byte[] encrypted_original = { };
+            byte[] key = { }, iv = { };
+            using (Aes aes = Aes.Create())
+            {
+                key = aes.Key;
+                iv = aes.IV;
+                ICryptoTransform encryptor = aes.CreateEncryptor(key, iv);
+                using (MemoryStream memory_stream = new MemoryStream())
+                {
+                    using (CryptoStream crypto_stream = new CryptoStream(memory_stream, encryptor, CryptoStreamMode.Write))
+                    {
+                        using (StreamWriter stream_writer = new StreamWriter(crypto_stream))
+                        {
+                            stream_writer.Write(original);
+                        }
+                        encrypted_original = memory_stream.ToArray();
+                    }
+                }
+            }
+            //string json = File.ReadAllText("users_settings/users_keys.json");
+            //List<Users_keys> list = new List<Users_keys>();
+            //Users_keys new_key = new Users_keys(current_user.login, current_user.password, _path, key, iv);
+            //MessageBox.Show($"{new_key.login}\r{new_key.password}\r{new_key.file_path}\r{new_key.key}\r{new_key.iv}");
+            //if (json.Length != 0)
+            //{
+            //    list = JsonConvert.DeserializeObject<List<Users_keys>>(json);
+            //    foreach (Users_keys user_key in list)
+            //    {
+            //        if ((user_key.login == current_user.login) & (user_key.password == current_user.password) & (user_key.file_path == _path))
+            //        {
+            //            list.Remove(user_key);
+            //            break;
+            //        }
+            //    }
+            //    list.Add(new_key);
+            //}
+            //else
+            //{
+            //    list.Add(new_key);
+            //}
+
+            
+            //json = JsonConvert.SerializeObject(list, Formatting.Indented);
+            //File.WriteAllText("users_settings/users_keys.json", json);
+            //Console.Write($"temp_{_path}");
+            int index = _local_path.LastIndexOf('.');
+            string extension = _local_path.Substring(index, _local_path.Length - index);
+            string path_without_extension = _local_path.Substring(0, _local_path.Length - extension.Length);
+            string encrypted_file_path = $"{path_without_extension}_temp{extension}";
+            //MessageBox.Show(encrypted_file_path);
+            File.WriteAllBytes(encrypted_file_path, encrypted_original);
+            
+            sqlite_command.CommandText = $"SELECT count(id_key) FROM keys WHERE local_path='{_local_path}'";
+            sqlite_connection.Open();
+            object count = sqlite_command.ExecuteScalar();
+            sqlite_connection.Close();
+            //MessageBox.Show($"111111\r\r\r{count.ToString()}");
+            if (count.ToString() == "0")
+            {
+                MessageBox.Show("0");
+                save_key(_server_path, _local_path, key, iv);
+            }
+            else
+            {
+                MessageBox.Show("not 0");
+                sqlite_connection.Open();
+                sqlite_command.CommandText = $"DELETE FROM keys WHERE local_path='{_local_path}'";
+                sqlite_command.ExecuteNonQuery();
+                sqlite_connection.Close();
+                save_key(_server_path, _local_path, key, iv);
+            }
+            return encrypted_file_path;
+        }
+
+        public void save_key(string _server_path, string _local_path, byte[] _key, byte[] _iv)
+        {
+            sqlite_command.CommandText = $"INSERT INTO keys('login', 'local_path', 'server_path', 'key', 'iv') VALUES (@login, @local, @server, @key, @iv)";
+            sqlite_command.Parameters.AddWithValue("@login", current_user.login);
+            sqlite_command.Parameters.AddWithValue("@local", _local_path);
+            sqlite_command.Parameters.AddWithValue("@server", _server_path);
+            sqlite_command.Parameters.AddWithValue("@key", _key);
+            sqlite_command.Parameters.AddWithValue("@iv", _iv);
+            sqlite_connection.Open();
+            sqlite_command.ExecuteNonQuery();
+            sqlite_connection.Close();
+        }
+
+        public void decrypt_file(string _path_to_encrypt_file, string _server_path)
+        {
+            byte[] encrypted_original = File.ReadAllBytes(_path_to_encrypt_file);
+            string orig = "";
+            //string json = File.ReadAllText("users_settings/users_keys.json");
+            //List<Users_keys> keys = new List<Users_keys>();
+            //keys = JsonConvert.DeserializeObject<List<Users_keys>>(json);
+            //int index_temp = _path_to_temp_file.LastIndexOf('_');
+            //int index_extension = _path_to_temp_file.LastIndexOf('.');
+            //string extension = _path_to_temp_file.Substring(index_extension, _path_to_temp_file.Length - index_extension);
+            //string result_file_path = _path_to_temp_file.Substring(0, _path_to_temp_file.Length - index_temp) + extension;
+            //MessageBox.Show($"decrypt\rtemp path{_path_to_temp_file}\rresult path{result_file_path}");
+            //foreach (Users_keys key in keys)
+            //{
+            //if ((key.login == current_user.login) & (key.password == current_user.password) & (key.file_path == _path_to_encrypt_file))
+            //{
+            //Users_keys current_key = key;
+            //MessageBox.Show($"{current_user.login}\r{current_key.login}\r\r{current_user.passw}");
 
 
+            using (Aes aes = Aes.Create())
+            {
+                sqlite_command.CommandText = $"SELECT key, iv FROM keys WHERE server_path='{_server_path}'";
+                sqlite_connection.Open();
+                SQLiteDataReader reader = sqlite_command.ExecuteReader();
+                while (reader.Read())
+                {
+                    aes.Key = (byte[])reader["key"];
+                    aes.IV = (byte[])reader["iv"];
+                }
+                sqlite_connection.Close();
+                //aes.Key = current_key.key;
+                //aes.IV = current_key.iv;
+                ICryptoTransform decryptor = aes.CreateDecryptor(aes.Key, aes.IV);
+                using (MemoryStream memory_stream = new MemoryStream(encrypted_original))
+                {
+                    using (CryptoStream crypto_stream = new CryptoStream(memory_stream, decryptor, CryptoStreamMode.Read))
+                    {
+                        using (StreamReader stream_reader = new StreamReader(crypto_stream))
+                        {
+                            orig = stream_reader.ReadToEnd();
+                        }
+                    }
+                }
+            }
+            byte[] s = Encoding.UTF8.GetBytes(orig);
+            File.Delete(_path_to_encrypt_file);
+            File.WriteAllBytes(_path_to_encrypt_file, s);
+            //break;
+            //}
+            //}
+        }
 
+        private void encryptфывы_file(object sender, RoutedEventArgs e)
+        {
+            byte[] key = { }, iv = { };
+            byte[] original_bytes = File.ReadAllBytes("milky-way-nasa.jpg");
+            string original = Encoding.Default.GetString(original_bytes);
+            byte[] encrypted_original = { };
+            using (Aes aes = Aes.Create())
+            {
+                key = aes.Key;
+                iv = aes.IV;
+                ICryptoTransform encryptor = aes.CreateEncryptor(key, iv);
+                using (MemoryStream memory_stream = new MemoryStream())
+                {
+                    using (CryptoStream crypto_stream = new CryptoStream(memory_stream, encryptor, CryptoStreamMode.Write))
+                    {
+                        using (StreamWriter stream_writer = new StreamWriter(crypto_stream))
+                        {
+                            stream_writer.Write(original);
+                        }
+                        encrypted_original = memory_stream.ToArray();
+                    }
+                }
 
+            }
+            //File.WriteAllBytes($"temp{=}", encrypted_original);
+            encrypted_original = null;
+            encrypted_original = File.ReadAllBytes("temp");
+            //MessageBox.Show($"{Encoding.Default.GetString(encrypted_original)}");
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+            string orig = "";
+            using (Aes aes = Aes.Create())
+            {
+                aes.Key = key;
+                aes.IV = iv;
+                ICryptoTransform decryptor = aes.CreateDecryptor(key, iv);
+                using (MemoryStream memory_stream = new MemoryStream(encrypted_original))
+                {
+                    using (CryptoStream crypto_stream = new CryptoStream(memory_stream, decryptor, CryptoStreamMode.Read))
+                    {
+                        using (StreamReader stream_reader = new StreamReader(crypto_stream))
+                        {
+                            orig = stream_reader.ReadToEnd();
+                        }
+                    }
+                }
+            }
+            //MessageBox.Show(orig);
+            byte[] s = Encoding.Default.GetBytes(orig);
+            File.WriteAllBytes("milky-way-nasasasasa.jpg", s);
+            MessageBox.Show("complete");
+        }
     }
 
 
